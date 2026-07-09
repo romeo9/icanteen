@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { db } from '../db'
+import { supabase } from '../utils/supabase';
 
 export function AddItemForm() {
     const [name, setName] = useState('');
@@ -31,7 +32,7 @@ export function AddItemForm() {
             };
 
             // Check internet connection
-            const isOnline = false //navigator.onLine;
+            const isOnline = navigator.onLine;
 
             if (!isOnline) {
                 // OFFLINE, save locally on indexedDB
@@ -39,36 +40,8 @@ export function AddItemForm() {
                 alert("Nessun segnale in cantina! Oggetto salvato localmente sul telefono. Si sincronizzerà quando torni a casa. 🟡");
             } else {
                 // ONLINE, load photo on supabase bucket
-                const fileName = `${Date.now()}-${name.replace(/\s+/g, '_')}.webp`;
-
-                const { data: storageData, error: storageError } = await supabase.storage
-                    .from('basement-photos')
-                    .upload(fileName, compressedBlob);
-
-                if (storageError) throw storageError;
-
-                // Get public URL of loaded image
-                const { data: urlData } = supabase.storage
-                    .from('basement-photos')
-                    .getPublicUrl(fileName);
-
-                // Set data and url to postgres object on supabase
-                const { error: dbError } = await supabase
-                    .from('inventory')
-                    .insert([
-                        { 
-                            name: newItem.name, 
-                            location: newItem.location, 
-                            description: newItem.description, 
-                            image_url: urlData.publicUrl 
-                        }
-                    ]);
-
-                if (dbError) throw dbError;
-
-                newItem.isSynced = true;
-                await db.items.add(newItem);
-                
+                // TODO: salve on supabase
+                uploadImage(newItem)
                 alert("Oggetto salvato sul Cloud e sul dispositivo con successo! 🟢");
             }
 
@@ -84,6 +57,21 @@ export function AddItemForm() {
         } finally {
             setLoading(false); // stop loading
         }
+    }
+
+    async function uploadImage(item) {
+        const file = item.imageBlob;
+        const fileName = `${item.id}-FilenameTest`;
+
+        const { data, error } = await supabase.storage
+            .from("images")
+            .upload(fileName, file);
+
+        if (error) {
+            console.error("Upload error:", error);
+            return;
+        }
+        console.log("Upload completato:", data);
     }
 
 
